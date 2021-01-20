@@ -1,4 +1,4 @@
-def perfomance_measure(c,signals,el,le,es,se,leverage,stop_loss,time):
+def perfomance_measure(c,signals,el,le,es,se,size,leverage,stop_loss,time):
     # initial variables
     x = 0
     init_cap = 1
@@ -8,32 +8,55 @@ def perfomance_measure(c,signals,el,le,es,se,leverage,stop_loss,time):
     capital = np.zeros(len(signals)) 
 
     # run
-    while x < len(signals):
+    while x < (len(signals)-5):
 
-        if singals[x] == el:
+        if signals[x] == el:
             # enter long
+
+            # trade vars 
             trades += 1
+            #entry price
             p = c[x]
-            pa = (((cap * 0.3) / p)*leverage)
-            stop_loss = (p / stop_loss)
-            while x < len(signals):
-                pos_diff = (((c[x] - p )/ p)*leverage)
+            # amount in usd
+            usd = ((cap * size)*leverage)
+            startFee = (usd * 0.1)
+            cap -= (usd + startFee)
+            # amount in btc
+            btc = (usd / p)
+            # stop loss
+            sl = (p - (p - (p * stop_loss)))
+            
+            # info
+            print(f'type: Long - entry price: {p} - stop loss: {sl} - usd: {usd} - btc: {btc}')
+
+            while x < (len(signals)-5):
+
+                diff = (((c[x] - p )/ p)*leverage)
+                
                 # exit long
-                if pos_diff <= -1:
-                    cap -= (pa * c[x])
+
+                if diff <= -1: # liquidation
+                    print(f'!LIQUIDATED! - pos diff: {diff}')
                     capital[x] = cap
                     x += 1
                     break
-                if c[x] <= stop_loss:
-                    cap += (pa * c[x])
+
+                if c[x] <= sl:  # Stop loss
+                    print(f'stop loss reached - {sl} - return: {btc * c[x]}')
+                    usd = (btc * c[x])
+                    cap += (usd - (usd * 0.1))
                     capital[x] = cap
                     x += 1
-                    break    
-                if signals[x] == le:
-                    cap += (pa * c[x])
+                    break
+
+                if signals[x] == le: # Exit
+                    print(f'Exited trade: Long - exit price: {c[x]} - return: {btc * c[x]}')
+                    usd = (btc * c[x])
+                    cap += (usd - (usd * 0.1))
                     capital[x] = cap
                     x += 1  
                     break
+
                 else:
                     capital[x] = cap
                     x += 1
@@ -43,38 +66,63 @@ def perfomance_measure(c,signals,el,le,es,se,leverage,stop_loss,time):
             break
 
         if signals[x] == es:
-            trades += 1
             # enter short
+
+            # trade vars 
+            trades += 1
+            #entry price
             p = c[x]
-            pa = (((cap * 0.3) / p)*leverage)
-            stop_loss = (p / stop_loss)
-            while x < len(signals):
-                pos_diff = (((p - c[x])/ p)*leverage)
-                # exit short
-                if pos_diff <= -1:
-                    cap -= (pa * c[x])
+            # amount in usd
+            usd = ((cap * size)*leverage)
+            startFee = (usd * 0.1)
+            cap -= (usd + startFee)
+            # amount in btc
+            btc = (usd / p)
+            # stop loss
+            sl = (p + (p - (p * stop_loss)))
+            
+            # info
+            print(f'type: Short - entry price: {p} - stop loss: {sl} - usd: {usd} - btc: {btc}')
+
+            while x < (len(signals)-5):
+
+                diff = (((p - c[x])/ p)*leverage)
+                
+                # exit long
+
+                if diff <= -1: # liquidation
+                    print(f'!LIQUIDATED!')
                     capital[x] = cap
                     x += 1
                     break
-                if c[x] >= stop_loss:
-                    cap += (pa * c[x])
+
+                if c[x] >= sl:  # Stop loss
+                    print(f'stop loss reached - {sl} - return: {btc * c[x]}')
+                    usd = (btc * c[x])
+                    cap += (usd - (usd * 0.1))
                     capital[x] = cap
                     x += 1
-                    break    
-                if signals[x] == se:
-                    cap += (pa * c[x])
+                    break
+
+                if signals[x] == se: # Exit
+                    print(f'Exited trade: Short - exit price: {c[x]} - return: {btc * c[x]}')
+                    usd = (btc * c[x])
+                    cap += (usd - (usd * 0.1))
                     capital[x] = cap
                     x += 1  
                     break
+
                 else:
                     capital[x] = cap
                     x += 1
+                
         else:
             capital[x] = cap
             x += 1
 
     # Cagr
     capital_pd = pd.DataFrame(capital)
+    capital_pd.to_csv('capital.csv')
     cagr = (((cap / init_cap) ** (1/time)) - 1)
     # maxdd
     window = len(signals)
@@ -85,5 +133,7 @@ def perfomance_measure(c,signals,el,le,es,se,leverage,stop_loss,time):
     mar = (cagr/maxdd)
     # roi
     roi = (cap/init_cap)
+    #print(f'capital: {cap} - mar: {mar} - roi: {roi}')
+    print(trades)
 
-    return scrub,cap,trades,mar,roi
+    return scrub,capital,trades,mar,roi
